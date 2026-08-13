@@ -1,0 +1,11 @@
+# Registros de instalación
+*.log
+instalacion_*.log
+
+# Paquetes de instalación .deb (se alojan en GitHub Releases para evitar el límite de 100 MB de Git)
+programas/*.deb
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+*.tmp
