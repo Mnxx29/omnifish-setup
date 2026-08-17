@@ -8,9 +8,7 @@ Este repositorio contiene la suite de automatización de instalación y configur
 
 ```text
 omnifish-setup/
-├── Instalar_DobleClic.sh       # Lanzador rápido por doble clic (Abre terminal + sudo)
-├── Instalar-Omnifish.desktop   # Acceso directo para escritorio Ubuntu
-├── instalar.sh                # Script principal de instalación automatizada
+├── instalacion.sh             # Script principal de instalación automatizada
 ├── README.md                  # Documentación del proyecto
 └── programas/                 # Carpeta receptora de paquetes .deb
     └── .gitkeep
@@ -36,23 +34,24 @@ omnifish-setup/
 Debido a que instaladores como **Google Chrome (~130 MB)** y **TeamViewer (~115 MB)** superan el límite de 100 MB por archivo de GitHub, los archivos `.deb` **no se suben directamente al código fuente de Git**.
 
 En su lugar, los instaladores se alojan en la sección de **[GitHub Releases](https://github.com/mnxx29/omnifish-setup/releases)**:
-- Si ejecutas el script desde un clon directo de Git sin los `.deb`, `instalar.sh` los **descargará automáticamente** desde la última **Release** publicada en GitHub.
+- Si ejecutas el script desde un clon directo de Git sin los `.deb`, `instalacion.sh` los **descargará automáticamente** desde la última **Release** publicada en GitHub.
 - Si copias la carpeta a un **pendrive USB** con los paquetes `.deb` guardados en `programas/`, la instalación se realizará 100% **offline**.
 
 ---
 
 ## 🚀 Modo de Uso
 
-### Opción 1: Ejecución en Ubuntu (Gráfica - Doble Clic)
-1. Abre la carpeta `omnifish-setup`.
-2. Haz **doble clic** sobre `Instalar_DobleClic.sh` (o clic derecho → *Ejecutar como programa*).
-3. Ingresa la contraseña de superusuario (`sudo`) en la ventana emergente.
+Ejecutar desde la terminal en Ubuntu:
 
-### Opción 2: Desde Terminal (Manual)
+```bash
+sudo bash instalacion.sh
+```
+
+*(O clonar y ejecutar directamente):*
 ```bash
 git clone https://github.com/mnxx29/omnifish-setup.git
 cd omnifish-setup
-sudo bash instalar.sh
+sudo bash instalacion.sh
 ```
 
 ---

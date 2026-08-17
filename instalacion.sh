@@ -2,7 +2,7 @@
 # ============================================================
 #  Omnifish - Script de configuración PC (Ubuntu 24.04 LTS)
 #  Uso: copiar esta carpeta al pendrive junto con los .deb
-#       Ejecutar con: sudo bash instalar.sh
+#       Ejecutar con: sudo bash instalacion.sh
 # ============================================================
 
 set -e  # Detener si hay error grave no controlado
@@ -34,7 +34,7 @@ separador
 # ── VERIFICACIÓN DE PRIVILEGIOS ──────────────────────────────
 if [ "$EUID" -ne 0 ]; then
     echo -e "\n${ERR} Este script debe ejecutarse con privilegios de superusuario (root/sudo)."
-    echo -e "     Por favor ejecuta: ${CYAN}sudo bash instalar.sh${RESET}\n"
+    echo -e "     Por favor ejecuta: ${CYAN}sudo bash instalacion.sh${RESET}\n"
     exit 1
 fi
 
