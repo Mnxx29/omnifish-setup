@@ -1,9 +1,0 @@
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=Instalar Omnifish Ubuntu 24.04
-Comment=Instalación automatizada de programas
-Exec=gnome-terminal --title="Omnifish Setup 24.04" -- bash -c 'SCRIPT_DIR="$(dirname "%k")"; cd "$SCRIPT_DIR"; sudo bash instalar.sh; echo ""; read -p "Presione ENTER para salir..."'
-Icon=system-software-install
-Terminal=false
-Categories=System;Setup;
