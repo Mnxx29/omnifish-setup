@@ -38,6 +38,12 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# ── AUTO-ACTUALIZACIÓN DESDE GITHUB ────────────────────────────
+if [ -d "$SCRIPT_DIR/.git" ] && command -v git &>/dev/null; then
+    log "\n${INFO} Verificando actualizaciones del repositorio en GitHub..."
+    git -C "$SCRIPT_DIR" pull origin main 2>&1 | tee -a "$LOG" || log "${WARN} No se pudo sincronizar con GitHub (se usará la versión local)."
+fi
+
 # ── FASE 0: Habilitar Repositorios Ubuntu 24.04 & Dependencias Base ───────
 separador
 log "\n${INFO} FASE 0: Habilitando repositorios y dependencias del sistema..."
@@ -48,7 +54,7 @@ add-apt-repository multiverse -y 2>&1 | tee -a "$LOG" >/dev/null || true
 
 log "  → Pre-instalando herramientas, librerías clave y VLC Media Player"
 apt update -y 2>&1 | tee -a "$LOG" >/dev/null || true
-apt install -y software-properties-common curl wget gpg ca-certificates lsb-release net-tools libcanberra-gtk-module libcanberra-gtk3-module libgconf-2-4 vlc 2>&1 | tee -a "$LOG" | grep -E "upgraded|installed|removed|^Err" || true
+apt install -y software-properties-common git curl wget gpg ca-certificates lsb-release net-tools libcanberra-gtk-module libcanberra-gtk3-module libgconf-2-4 vlc 2>&1 | tee -a "$LOG" | grep -E "upgraded|installed|removed|^Err" || true
 
 log "$OK FASE 0 completada."
 

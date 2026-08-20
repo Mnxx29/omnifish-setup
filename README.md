@@ -54,18 +54,15 @@ cd omnifish-setup
 sudo bash instalacion.sh
 ```
 
----
-
 ## 📋 Proceso Automatizado del Script
 
-1. **FASE 0**: Habilita repositorios `universe`/`multiverse` e instala herramientas base (`curl`, `wget`, `vlc`, etc.).
-2. **FASE 1**: Ejecuta `apt update` + `full-upgrade` inicial para nivelar el sistema operativo.
-3. **FASE 2**: Obtiene los archivos `.deb` (local o vía GitHub Release) y realiza triple pasada de instalación (`apt` + `dpkg` + `apt -fy`).
-4. **FASE 3**: Actualización inmediata a la versión más reciente en la nube (`apt update` + `only-upgrade`).
-5. **FASE 4**: Desactiva **Wayland** en `/etc/gdm3/custom.conf` (indispensable para permitir control remoto en AnyDesk/TeamViewer/RustDesk).
-6. **LOG**: Genera un archivo `.log` con marca temporal en el directorio.
-
----
+1. **Auto-actualización**: Al ejecutarse en un repositorio clonado, el script realiza un `git pull` automático para obtener los últimos cambios de GitHub.
+2. **FASE 0**: Habilita repositorios `universe`/`multiverse` e instala herramientas base (`git`, `curl`, `wget`, `vlc`, etc.).
+3. **FASE 1**: Ejecuta `apt update` + `full-upgrade` inicial para nivelar el sistema operativo.
+4. **FASE 2**: Obtiene los archivos `.deb` (local o vía GitHub Release) y realiza triple pasada de instalación (`apt` + `dpkg` + `apt -fy`).
+5. **FASE 3**: Actualización inmediata a la versión más reciente en la nube (`apt update` + `only-upgrade`).
+6. **FASE 4**: Desactiva **Wayland** en `/etc/gdm3/custom.conf` (indispensable para permitir control remoto en AnyDesk/TeamViewer/RustDesk).
+7. **LOG**: Genera un archivo `.log` con marca temporal en el directorio.
 
 ## 📝 Tareas Posteriores a la Instalación
 
