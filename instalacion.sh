@@ -85,27 +85,63 @@ mkdir -p "$DEB_DIR"
 
 GITHUB_REPO="mnxx29/omnifish-setup"
 RELEASE_URL="https://github.com/$GITHUB_REPO/releases/latest/download"
-PAQUETES_ESPERADOS=(
-    "anydesk_8.0.4-1_amd64.deb"
-    "google-chrome-stable_current_amd64.deb"
-    "ipscan_3.9.3_amd64.deb"
-    "rustdesk-1.4.9-x86_64.deb"
-    "teamviewer_15.81.2_amd64.deb"
+
+# Matriz de paquetes: "archivo.deb|url_github_release|url_oficial_directa"
+PAQUETES=(
+    "anydesk_8.0.4-1_amd64.deb|$RELEASE_URL/anydesk_8.0.4-1_amd64.deb|https://download.anydesk.com/linux/anydesk_8.0.4-1_amd64.deb"
+    "google-chrome-stable_current_amd64.deb|$RELEASE_URL/google-chrome-stable_current_amd64.deb|https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
+    "ipscan_3.9.3_amd64.deb|$RELEASE_URL/ipscan_3.9.3_amd64.deb|https://github.com/angryip/ipscan/releases/download/3.9.3/ipscan_3.9.3_amd64.deb"
+    "rustdesk-1.4.9-x86_64.deb|$RELEASE_URL/rustdesk-1.4.9-x86_64.deb|https://github.com/rustdesk/rustdesk/releases/download/1.4.9/rustdesk-1.4.9-x86_64.deb"
+    "teamviewer_15.81.2_amd64.deb|$RELEASE_URL/teamviewer_15.81.2_amd64.deb|https://download.teamviewer.com/download/linux/teamviewer_amd64.deb"
 )
 
-log "  → Verificando presencia de paquetes .deb localmente..."
-for pkg in "${PAQUETES_ESPERADOS[@]}"; do
-    if [ ! -f "$DEB_DIR/$pkg" ]; then
-        log "  ${WARN} No se encontró $pkg localmente. Descargando desde GitHub Release ($GITHUB_REPO)..."
-        if wget -q --show-progress -O "$DEB_DIR/$pkg" "$RELEASE_URL/$pkg" 2>/dev/null; then
-            log "  $OK Descargado: $pkg"
-        elif curl -sL -o "$DEB_DIR/$pkg" "$RELEASE_URL/$pkg"; then
-            log "  $OK Descargado: $pkg"
-        else
-            log "  $ERR No se pudo obtener $pkg desde GitHub Release."
-            rm -f "$DEB_DIR/$pkg"
+descargar_deb() {
+    local pkg_file="$1"
+    local primary_url="$2"
+    local fallback_url="$3"
+    local dest="$DEB_DIR/$pkg_file"
+
+    if [ -f "$dest" ] && dpkg-deb -I "$dest" &>/dev/null; then
+        log "  $OK Paquete verificado localmente: $pkg_file"
+        return 0
+    elif [ -f "$dest" ]; then
+        log "  ${WARN} $pkg_file local no es un archivo .deb válido. Eliminando archivo corrupto..."
+        rm -f "$dest"
+    fi
+
+    log "  ${INFO} Obteniendo $pkg_file..."
+
+    # Intento 1: GitHub Releases del proyecto Omnifish
+    if [ -n "$primary_url" ]; then
+        if curl -fsSL -o "$dest" "$primary_url" 2>/dev/null || wget -q --show-progress -O "$dest" "$primary_url" 2>/dev/null; then
+            if dpkg-deb -I "$dest" &>/dev/null; then
+                log "  $OK Descargado con éxito desde GitHub Release: $pkg_file"
+                return 0
+            fi
+            rm -f "$dest"
         fi
     fi
+
+    # Intento 2: Servidores oficiales del proveedor
+    if [ -n "$fallback_url" ]; then
+        log "  ${WARN} Intentando descarga directa desde servidor oficial del proveedor..."
+        if curl -fsSL -o "$dest" "$fallback_url" 2>/dev/null || wget -q --show-progress -O "$dest" "$fallback_url" 2>/dev/null; then
+            if dpkg-deb -I "$dest" &>/dev/null; then
+                log "  $OK Descargado con éxito desde proveedor oficial: $pkg_file"
+                return 0
+            fi
+            rm -f "$dest"
+        fi
+    fi
+
+    log "  ${ERR} No se pudo obtener un paquete .deb válido para: $pkg_file"
+    return 1
+}
+
+log "  → Verificando presencia y validez de paquetes .deb..."
+for item in "${PAQUETES[@]}"; do
+    IFS='|' read -r pkg_file primary_url fallback_url <<< "$item"
+    descargar_deb "$pkg_file" "$primary_url" "$fallback_url" || true
 done
 
 shopt -s nullglob

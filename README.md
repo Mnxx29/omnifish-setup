@@ -29,13 +29,15 @@ omnifish-setup/
 
 ---
 
-## 📦 Gestión de Instaladores (.deb) y GitHub Releases
+## 📦 Gestión de Instaladores (.deb) y Descargas Inteligentes
 
-Debido a que instaladores como **Google Chrome (~130 MB)** y **TeamViewer (~115 MB)** superan el límite de 100 MB por archivo de GitHub, los archivos `.deb` **no se suben directamente al código fuente de Git**.
+Debido a que instaladores como **Google Chrome (~130 MB)** y **TeamViewer (~115 MB)** superan el límite de 100 MB por archivo de GitHub, los paquetes `.deb` **no se suben directamente al código fuente de Git**.
 
-En su lugar, los instaladores se alojan en la sección de **[GitHub Releases](https://github.com/mnxx29/omnifish-setup/releases)**:
-- Si ejecutas el script desde un clon directo de Git sin los `.deb`, `instalacion.sh` los **descargará automáticamente** desde la última **Release** publicada en GitHub.
-- Si copias la carpeta a un **pendrive USB** con los paquetes `.deb` guardados en `programas/`, la instalación se realizará 100% **offline**.
+El script `instalacion.sh` cuenta con un sistema inteligente de descarga con triple nivel de respaldo:
+1. **Local / USB (Offline)**: Si copias la carpeta a un pendrive USB con los `.deb` guardados en `programas/`, la instalación se realiza 100% sin internet.
+2. **GitHub Releases**: Si falta algún archivo local, el script intentará descargarlo desde las [Releases de GitHub](https://github.com/mnxx29/omnifish-setup/releases).
+3. **Servidores Oficiales (Fallback)**: Si no hay Release publicada en GitHub, el script descargará automáticamente las versiones oficiales desde los servidores oficiales de **Google, AnyDesk, TeamViewer, RustDesk y Angry IP Scanner**.
+4. **Validación automática**: Todos los archivos son verificados con `dpkg-deb` para descartar descargas corruptas o respuestas 404 antes de intentar su instalación.
 
 ---
 
