@@ -100,6 +100,7 @@ descargar_deb() {
     local primary_url="$2"
     local fallback_url="$3"
     local dest="$DEB_DIR/$pkg_file"
+    local temp_dest="$dest.tmp"
 
     if [ -f "$dest" ] && dpkg-deb -I "$dest" &>/dev/null; then
         log "  $OK Paquete verificado localmente: $pkg_file"
@@ -111,26 +112,42 @@ descargar_deb() {
 
     log "  ${INFO} Obteniendo $pkg_file..."
 
+    probar_descarga() {
+        local url="$1"
+        [ -z "$url" ] && return 1
+        rm -f "$temp_dest"
+
+        if command -v curl &>/dev/null; then
+            curl -fsSL --connect-timeout 15 --retry 2 -o "$temp_dest" "$url" 2>/dev/null || rm -f "$temp_dest"
+        fi
+
+        if [ ! -f "$temp_dest" ] && command -v wget &>/dev/null; then
+            wget -q --timeout=15 --tries=2 -O "$temp_dest" "$url" 2>/dev/null || rm -f "$temp_dest"
+        fi
+
+        if [ -f "$temp_dest" ] && dpkg-deb -I "$temp_dest" &>/dev/null; then
+            mv -f "$temp_dest" "$dest"
+            return 0
+        else
+            rm -f "$temp_dest"
+            return 1
+        fi
+    }
+
     # Intento 1: GitHub Releases del proyecto Omnifish
     if [ -n "$primary_url" ]; then
-        if curl -fsSL -o "$dest" "$primary_url" 2>/dev/null || wget -q --show-progress -O "$dest" "$primary_url" 2>/dev/null; then
-            if dpkg-deb -I "$dest" &>/dev/null; then
-                log "  $OK Descargado con éxito desde GitHub Release: $pkg_file"
-                return 0
-            fi
-            rm -f "$dest"
+        if probar_descarga "$primary_url"; then
+            log "  $OK Descargado con éxito desde GitHub Release ($GITHUB_REPO): $pkg_file"
+            return 0
         fi
     fi
 
     # Intento 2: Servidores oficiales del proveedor
     if [ -n "$fallback_url" ]; then
-        log "  ${WARN} Intentando descarga directa desde servidor oficial del proveedor..."
-        if curl -fsSL -o "$dest" "$fallback_url" 2>/dev/null || wget -q --show-progress -O "$dest" "$fallback_url" 2>/dev/null; then
-            if dpkg-deb -I "$dest" &>/dev/null; then
-                log "  $OK Descargado con éxito desde proveedor oficial: $pkg_file"
-                return 0
-            fi
-            rm -f "$dest"
+        log "  ${WARN} Release no disponible en GitHub. Intentando servidor oficial del proveedor..."
+        if probar_descarga "$fallback_url"; then
+            log "  $OK Descargado con éxito desde proveedor oficial: $pkg_file"
+            return 0
         fi
     fi
 
