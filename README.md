@@ -24,6 +24,7 @@ omnifish-setup/
 | **TeamViewer** | 15.81.2 | Soporte Remoto |
 | **RustDesk** | 1.4.9 | Soporte Remoto |
 | **Angry IP Scanner** | 3.9.3 | Red / Diagnóstico |
+| **Hikvision SADP GUI** | Nativo Linux (`main`) | Red / Diagnóstico Cámaras IP |
 | **Google Chrome** | Última versión estable | Navegador Web |
 | **VLC Media Player** | Última versión apt | Reproductor Multimedia |
 
@@ -56,18 +57,27 @@ cd omnifish-setup
 sudo bash instalacion.sh
 ```
 
+Para abrir la herramienta de cámaras Hikvision tras la instalación:
+```bash
+sadp-gui
+```
+
+---
+
 ## 📋 Proceso Automatizado del Script
 
 1. **Auto-actualización**: Al ejecutarse en un repositorio clonado, el script realiza un `git pull` automático para obtener los últimos cambios de GitHub.
-2. **FASE 0**: Habilita repositorios `universe`/`multiverse` e instala herramientas base (`git`, `curl`, `wget`, `vlc`, etc.).
+2. **FASE 0**: Habilita repositorios `universe`/`multiverse` e instala herramientas base (`git`, `curl`, `wget`, `vlc`, `python3-pyqt6`, `ufw`, etc.).
 3. **FASE 1**: Ejecuta `apt update` + `full-upgrade` inicial para nivelar el sistema operativo.
-4. **FASE 2**: Obtiene los archivos `.deb` (local o vía GitHub Release) y realiza triple pasada de instalación (`apt` + `dpkg` + `apt -fy`).
+4. **FASE 2**: Obtiene los archivos `.deb` (local o vía GitHub Release) y realiza pasada de instalación individual por programa + resolución de dependencias.
 5. **FASE 3**: Actualización inmediata a la versión más reciente en la nube (`apt update` + `only-upgrade`).
-6. **FASE 4**: Desactiva **Wayland** en `/etc/gdm3/custom.conf` (indispensable para permitir control remoto en AnyDesk/TeamViewer/RustDesk).
-7. **LOG**: Genera un archivo `.log` con marca temporal en el directorio.
+6. **FASE 4**: Despliega **Hikvision SADP GUI** en `/opt/hikvision-sadp-gui`, crea el binario global `sadp-gui`, el acceso directo `.desktop`, habilita el puerto UDP 37020 en UFW y configura `rp_filter=2` en el Kernel.
+7. **FASE 5**: Desactiva **Wayland** en `/etc/gdm3/custom.conf` (indispensable para permitir control remoto en AnyDesk/TeamViewer/RustDesk).
+8. **LOG & RESUMEN**: Genera un archivo `.log` detallado e imprime la tabla de verificación de programas.
 
 ## 📝 Tareas Posteriores a la Instalación
 
 - [ ] Reiniciar el sistema (para cambiar de Wayland a Xorg).
 - [ ] Configurar clave de acceso no atendido en AnyDesk / TeamViewer / RustDesk.
 - [ ] Registrar IDs de conexión en el inventario.
+

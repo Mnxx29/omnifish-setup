@@ -55,8 +55,8 @@ add-apt-repository multiverse -y 2>&1 | tee -a "$LOG" >/dev/null || true
 log "  → [2/3] Actualizando listas de paquetes de Ubuntu (apt update)... (esto puede demorar unos momentos)"
 apt update -y 2>&1 | tee -a "$LOG" | grep --line-buffered -E "Get:|Hit:|Ign:|Err:|Obteniendo|Leyendo" || true
 
-log "  → [3/3] Instalando utilidades base y VLC Media Player... (esto puede tomar 1 o 2 minutos)"
-apt install -y software-properties-common git curl wget gpg ca-certificates lsb-release net-tools libcanberra-gtk-module libcanberra-gtk3-module libgconf-2-4 vlc 2>&1 | tee -a "$LOG" | grep --line-buffered -E "upgraded|installed|removed|Desempaquetando|Configurando|^Err" || true
+log "  → [3/3] Instalando utilidades base, Python PyQt6, UFW y VLC... (esto puede tomar 1 o 2 minutos)"
+apt install -y software-properties-common git curl wget gpg ca-certificates lsb-release net-tools libcanberra-gtk-module libcanberra-gtk3-module libgconf-2-4 vlc python3-pyqt6 ufw 2>&1 | tee -a "$LOG" | grep --line-buffered -E "upgraded|installed|removed|Desempaquetando|Configurando|^Err" || true
 
 log "$OK FASE 0 completada."
 
@@ -234,9 +234,66 @@ apt clean 2>&1 | tee -a "$LOG"
 
 log "$OK FASE 3 completada."
 
-# ── FASE 4: Desactivar Wayland (Crítico para Ubuntu 24.04 y Soporte Remoto) ───
+# ── FASE 4: Instalación y Configuración de Hikvision SADP GUI (Linux) ────────
 separador
-log "\n${INFO} FASE 4: Desactivando Wayland para asegurar control remoto en Ubuntu 24.04..."
+log "\n${INFO} FASE 4: Instalando Hikvision SADP GUI para Linux (Herramienta SADP Nativa)..."
+
+SADP_DIR="/opt/hikvision-sadp-gui"
+SADP_REPO="https://github.com/Mnxx29/hikvision-sadp-gui-linux.git"
+LOCAL_SADP="$SCRIPT_DIR/programas/hikvision-sadp-gui-linux"
+
+log "  → [1/5] Obteniendo código fuente de Hikvision SADP GUI..."
+if [ -d "$SADP_DIR/.git" ]; then
+    log "        (Actualizando repositorio existente en $SADP_DIR...)"
+    git -C "$SADP_DIR" pull origin main 2>&1 | tee -a "$LOG" || true
+elif [ -d "$LOCAL_SADP" ]; then
+    log "        (Copiando desde pendrive/copia local en $LOCAL_SADP...)"
+    mkdir -p "$SADP_DIR"
+    cp -rf "$LOCAL_SADP"/* "$SADP_DIR/" 2>&1 | tee -a "$LOG" || true
+else
+    log "        (Clonando repositorio desde GitHub: $SADP_REPO...)"
+    git clone "$SADP_REPO" "$SADP_DIR" 2>&1 | tee -a "$LOG" || true
+fi
+
+log "  → [2/5] Creando ejecutable global (/usr/local/bin/sadp-gui)..."
+cat << 'EOF' > /usr/local/bin/sadp-gui
+#!/bin/bash
+exec python3 /opt/hikvision-sadp-gui/gui_sadp.py "$@"
+EOF
+chmod +x /usr/local/bin/sadp-gui
+
+log "  → [3/5] Creando acceso directo en el menú de aplicaciones de Ubuntu..."
+cat << 'EOF' > /usr/share/applications/sadp-gui.desktop
+[Desktop Entry]
+Name=Hikvision SADP GUI
+Comment=Descubridor de Cámaras IP y Dispositivos Hikvision para Linux
+Exec=sadp-gui
+Icon=network-workgroup
+Terminal=false
+Type=Application
+Categories=Network;Utility;System;
+EOF
+chmod +x /usr/share/applications/sadp-gui.desktop
+
+log "  → [4/5] Configurando reglas del firewall UFW para puerto SADP (UDP 37020)..."
+if command -v ufw &>/dev/null; then
+    ufw allow 37020/udp 2>&1 | tee -a "$LOG" || true
+    ufw allow from any port 37020 proto udp 2>&1 | tee -a "$LOG" || true
+    ufw allow out proto udp to 224.0.0.0/4 2>&1 | tee -a "$LOG" || true
+fi
+
+log "  → [5/5] Configurando parámetros del kernel para recepción en subredes múltiples..."
+cat << 'EOF' > /etc/sysctl.d/99-sadp.conf
+net.ipv4.conf.all.rp_filter=2
+net.ipv4.conf.default.rp_filter=2
+EOF
+sysctl -p /etc/sysctl.d/99-sadp.conf 2>&1 | tee -a "$LOG" || true
+
+log "$OK FASE 4 completada: Hikvision SADP GUI instalado y listo para usar con el comando 'sadp-gui'."
+
+# ── FASE 5: Desactivar Wayland (Crítico para Ubuntu 24.04 y Soporte Remoto) ───
+separador
+log "\n${INFO} FASE 5: Desactivando Wayland para asegurar control remoto en Ubuntu 24.04..."
 
 CONF="/etc/gdm3/custom.conf"
 log "  → Verificando archivo de configuración de GDM3 ($CONF)..."
@@ -282,6 +339,13 @@ for i in "${!PROGRAMAS[@]}"; do
         log "  $WARN ${NOMBRES[$i]} — verificar manualmente"
     fi
 done
+
+log "  → Comprobando estado de Hikvision SADP GUI..."
+if [ -f "/usr/local/bin/sadp-gui" ] && [ -d "/opt/hikvision-sadp-gui" ]; then
+    log "  $OK Hikvision SADP GUI (comando 'sadp-gui') instalado y configurado"
+else
+    log "  $WARN Hikvision SADP GUI — verificar manualmente"
+fi
 
 WAYLAND_STATUS=$(grep "WaylandEnable" /etc/gdm3/custom.conf 2>/dev/null | head -1 || echo "no encontrado")
 log "  ${INFO} Estado de Wayland en GDM3: $WAYLAND_STATUS"
