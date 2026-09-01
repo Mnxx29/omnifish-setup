@@ -48,13 +48,15 @@ fi
 separador
 log "\n${INFO} FASE 0: Habilitando repositorios y dependencias del sistema..."
 
-log "  → Habilitando repositorios universe y multiverse"
+log "  → [1/3] Habilitando repositorios universe y multiverse..."
 add-apt-repository universe -y 2>&1 | tee -a "$LOG" >/dev/null || true
 add-apt-repository multiverse -y 2>&1 | tee -a "$LOG" >/dev/null || true
 
-log "  → Pre-instalando herramientas, librerías clave y VLC Media Player"
-apt update -y 2>&1 | tee -a "$LOG" >/dev/null || true
-apt install -y software-properties-common git curl wget gpg ca-certificates lsb-release net-tools libcanberra-gtk-module libcanberra-gtk3-module libgconf-2-4 vlc 2>&1 | tee -a "$LOG" | grep -E "upgraded|installed|removed|^Err" || true
+log "  → [2/3] Actualizando listas de paquetes de Ubuntu (apt update)... (esto puede demorar unos momentos)"
+apt update -y 2>&1 | tee -a "$LOG" | grep --line-buffered -E "Get:|Hit:|Ign:|Err:|Obteniendo|Leyendo" || true
+
+log "  → [3/3] Instalando utilidades base y VLC Media Player... (esto puede tomar 1 o 2 minutos)"
+apt install -y software-properties-common git curl wget gpg ca-certificates lsb-release net-tools libcanberra-gtk-module libcanberra-gtk3-module libgconf-2-4 vlc 2>&1 | tee -a "$LOG" | grep --line-buffered -E "upgraded|installed|removed|Desempaquetando|Configurando|^Err" || true
 
 log "$OK FASE 0 completada."
 
@@ -62,21 +64,22 @@ log "$OK FASE 0 completada."
 separador
 log "\n${INFO} FASE 1: Re-contra actualizando sistema base..."
 
-log "  → apt update"
-apt update -y 2>&1 | tee -a "$LOG" | grep -E "Get:|Ign:|Hit:|Err:" || true
+log "  → [1/4] Consultando repositorios del sistema (apt update)..."
+apt update -y 2>&1 | tee -a "$LOG" | grep --line-buffered -E "Get:|Ign:|Hit:|Err:|Obteniendo|Leyendo" || true
 
-log "  → apt full-upgrade (actualizando todo el SO a la última versión disponible)"
-apt full-upgrade -y 2>&1 | tee -a "$LOG" | grep -E "upgraded|installed|removed|^Err" || true
+log "  → [2/4] Actualizando todos los paquetes del SO a la última versión disponible (apt full-upgrade)..."
+log "        (Por favor espera, este paso puede demorar varios minutos según la conexión e internet)"
+apt full-upgrade -y 2>&1 | tee -a "$LOG" | grep --line-buffered -E "upgraded|installed|removed|Desempaquetando|Configurando|^Err" || true
 
-log "  → fix-broken (limpieza pre-instalación)"
+log "  → [3/4] Reparando posibles paquetes no configurados o dependencias rotas (fix-broken)..."
 apt --fix-broken install -y 2>&1 | tee -a "$LOG" | tail -3
 
-log "  → dpkg --configure -a"
+log "  → [4/4] Verificando estado final de configuración de paquetes (dpkg --configure)..."
 dpkg --configure -a 2>&1 | tee -a "$LOG" | tail -3
 
 log "$OK FASE 1 completada."
 
-# ── FASE 2: Instalación de paquetes .deb locales ───────────────────────────
+# ── FASE 2: Instalación de programas desde la carpeta .deb ───────────────────────────
 separador
 log "\n${INFO} FASE 2: Instalando programas desde la carpeta .deb..."
 
@@ -110,7 +113,7 @@ descargar_deb() {
         rm -f "$dest"
     fi
 
-    log "  ${INFO} Obteniendo $pkg_file..."
+    log "  ${INFO} Obteniendo $pkg_file... por favor espera..."
 
     probar_descarga() {
         local url="$1"
@@ -136,29 +139,34 @@ descargar_deb() {
 
     # Intento 1: GitHub Releases del proyecto Omnifish
     if [ -n "$primary_url" ]; then
+        log "    → Descargando desde GitHub Release ($GITHUB_REPO)..."
         if probar_descarga "$primary_url"; then
-            log "  $OK Descargado con éxito desde GitHub Release ($GITHUB_REPO): $pkg_file"
+            log "    $OK Descargado con éxito: $pkg_file"
             return 0
         fi
     fi
 
     # Intento 2: Servidores oficiales del proveedor
     if [ -n "$fallback_url" ]; then
-        log "  ${WARN} Release no disponible en GitHub. Intentando servidor oficial del proveedor..."
+        log "    ${WARN} Release no disponible en GitHub. Intentando servidor oficial del proveedor..."
         if probar_descarga "$fallback_url"; then
-            log "  $OK Descargado con éxito desde proveedor oficial: $pkg_file"
+            log "    $OK Descargado con éxito desde proveedor oficial: $pkg_file"
             return 0
         fi
     fi
 
-    log "  ${ERR} No se pudo obtener un paquete .deb válido para: $pkg_file"
+    log "    ${ERR} No se pudo obtener un paquete .deb válido para: $pkg_file"
     return 1
 }
 
-log "  → Verificando presencia y validez de paquetes .deb..."
+TOTAL_PKGS=${#PAQUETES[@]}
+PKG_INDEX=1
+log "  → Verificando y descargando paquetes .deb ($TOTAL_PKGS en total)..."
 for item in "${PAQUETES[@]}"; do
     IFS='|' read -r pkg_file primary_url fallback_url <<< "$item"
+    log "\n  [Verificación $PKG_INDEX/$TOTAL_PKGS] $pkg_file"
     descargar_deb "$pkg_file" "$primary_url" "$fallback_url" || true
+    ((PKG_INDEX++))
 done
 
 shopt -s nullglob
@@ -170,21 +178,34 @@ if [ ${#DEBS[@]} -eq 0 ]; then
     exit 1
 fi
 
-log "  Archivos encontrados:"
+log "\n  Archivos .deb preparados para la instalación:"
 for deb in "${DEBS[@]}"; do
     log "    • $(basename "$deb")"
 done
 
-log "\n  → Pasada 1: apt install de archivos .deb locales"
-apt install -y "${DEBS[@]}" 2>&1 | tee -a "$LOG" || true
+log "\n  → Instalando individualmente cada programa .deb para reportar el progreso..."
+TOTAL_DEBS=${#DEBS[@]}
+CURR_DEB=1
 
-log "\n  → Pasada 2: dpkg -i de respaldo para asegurar el desempaquetado"
-dpkg -i "${DEBS[@]}" 2>&1 | tee -a "$LOG" | grep -E "^Selecting|^dpkg:|error|warning" || true
+for deb in "${DEBS[@]}"; do
+    DEB_NAME=$(basename "$deb")
+    log "\n  [$CURR_DEB/$TOTAL_DEBS] Instalando $DEB_NAME..."
+    log "        (Instalando paquete, por favor espera...)"
+    if apt install -y "$deb" 2>&1 | tee -a "$LOG" | grep --line-buffered -E "upgraded|installed|removed|Desempaquetando|Configurando|^Err" || true; then
+        log "  $OK $DEB_NAME instalado correctamente."
+    else
+        log "  $WARN Hubo una alerta al instalar $DEB_NAME, continuando..."
+    fi
+    ((CURR_DEB++))
+done
 
-log "\n  → Pasada 3: apt install -fy (resolución final de dependencias cruzadas)"
-apt install -fy 2>&1 | tee -a "$LOG" | grep -E "upgraded|installed|removed|^Err" || true
+log "\n  → Pasada de respaldo: dpkg -i para asegurar el desempaquetado de todos los paquetes"
+dpkg -i "${DEBS[@]}" 2>&1 | tee -a "$LOG" | grep --line-buffered -E "^Selecting|^dpkg:|Desempaquetando|Configurando|error|warning" || true
 
-log "  → fix-broken (post-instalación)"
+log "\n  → Resolviendo dependencias cruzadas restantes (apt install -fy)..."
+apt install -fy 2>&1 | tee -a "$LOG" | grep --line-buffered -E "upgraded|installed|removed|^Err" || true
+
+log "  → Limpieza final post-instalación (fix-broken)..."
 apt --fix-broken install -y 2>&1 | tee -a "$LOG" | tail -3
 
 log "$OK FASE 2 completada."
@@ -193,25 +214,22 @@ log "$OK FASE 2 completada."
 separador
 log "\n${INFO} FASE 3: Actualización instantánea de programas desde sus repositorios oficiales..."
 
-log "  → apt update (detectando los nuevos repositorios de Chrome, TeamViewer, AnyDesk, etc.)"
-apt update -y 2>&1 | tee -a "$LOG" | grep -E "Get:|Ign:|Hit:|Err:" || true
+log "  → [1/5] Actualizando lista de repositorios (detectando Chrome, TeamViewer, AnyDesk, etc.)..."
+apt update -y 2>&1 | tee -a "$LOG" | grep --line-buffered -E "Get:|Ign:|Hit:|Err:|Obteniendo|Leyendo" || true
 
-log "  → apt full-upgrade (actualizando altiro los programas a la última versión en la nube)"
-apt full-upgrade -y 2>&1 | tee -a "$LOG" | grep -E "upgraded|installed|removed|^Err" || true
+log "  → [2/5] Actualizando los programas instalados a la versión más reciente en la nube (apt full-upgrade)..."
+log "        (Por favor espera mientras se descargan e instalan las últimas versiones...)"
+apt full-upgrade -y 2>&1 | tee -a "$LOG" | grep --line-buffered -E "upgraded|installed|removed|Desempaquetando|Configurando|^Err" || true
 
-log "  → Forzar actualización explícita de aplicaciones recién instaladas"
-apt install -y --only-upgrade google-chrome-stable teamviewer anydesk rustdesk ipscan vlc 2>/dev/null || true
+log "  → [3/5] Forzando actualización explícita de aplicaciones recién instaladas..."
+apt install -y --only-upgrade google-chrome-stable teamviewer anydesk rustdesk ipscan vlc 2>&1 | tee -a "$LOG" | grep --line-buffered -E "upgraded|installed|removed|^Err" || true
 
-log "  → apt install -fy (cierre total de dependencias)"
+log "  → [4/5] Cierre final y verificación de dependencias (apt install -fy)..."
 apt install -fy 2>&1 | tee -a "$LOG" | tail -3
-
-log "  → dpkg --configure -a"
 dpkg --configure -a 2>&1 | tee -a "$LOG" | tail -3
 
-log "  → autoremove"
-apt autoremove -y 2>&1 | tee -a "$LOG" | grep -E "removed|^Err" || true
-
-log "  → clean"
+log "  → [5/5] Limpiando paquetes obsoletos y archivos temporales (autoremove / clean)..."
+apt autoremove -y 2>&1 | tee -a "$LOG" | grep --line-buffered -E "removed|^Err" || true
 apt clean 2>&1 | tee -a "$LOG"
 
 log "$OK FASE 3 completada."
@@ -221,6 +239,7 @@ separador
 log "\n${INFO} FASE 4: Desactivando Wayland para asegurar control remoto en Ubuntu 24.04..."
 
 CONF="/etc/gdm3/custom.conf"
+log "  → Verificando archivo de configuración de GDM3 ($CONF)..."
 
 if [ ! -f "$CONF" ]; then
     log "$WARN Archivo $CONF no encontrado. ¿GDM3 instalado?"
@@ -228,6 +247,7 @@ else
     if grep -E -q "^[[:space:]]*WaylandEnable=false" "$CONF"; then
         log "$OK Wayland ya estaba desactivado."
     else
+        log "  → Aplicando desactivación de Wayland en $CONF..."
         if grep -E -q "^[[:space:]]*#[[:space:]]*WaylandEnable=false" "$CONF"; then
             sed -i -E 's/^[[:space:]]*#[[:space:]]*WaylandEnable=false/WaylandEnable=false/' "$CONF"
         elif grep -q "^\[daemon\]" "$CONF"; then
@@ -254,6 +274,7 @@ PROGRAMAS=("anydesk" "teamviewer" "rustdesk" "ipscan" "google-chrome-stable" "vl
 NOMBRES=("AnyDesk" "TeamViewer" "RustDesk" "Angry IP Scanner" "Google Chrome" "VLC Media Player")
 
 for i in "${!PROGRAMAS[@]}"; do
+    log "  → Comprobando estado de ${NOMBRES[$i]}..."
     VER=$(dpkg-query -W -f='${Version}' "${PROGRAMAS[$i]}" 2>/dev/null || echo "")
     if [ -n "$VER" ]; then
         log "  $OK ${NOMBRES[$i]} (v$VER) instalado y actualizado"
@@ -263,7 +284,7 @@ for i in "${!PROGRAMAS[@]}"; do
 done
 
 WAYLAND_STATUS=$(grep "WaylandEnable" /etc/gdm3/custom.conf 2>/dev/null | head -1 || echo "no encontrado")
-log "  ${INFO} Wayland en GDM3: $WAYLAND_STATUS"
+log "  ${INFO} Estado de Wayland en GDM3: $WAYLAND_STATUS"
 
 separador
 log "\n${VERDE}${NEGRITA}  ¡Proceso completado con éxito!${RESET}"
